@@ -1,37 +1,9 @@
-import { Authenticator } from 'remix-auth'
-import { OAuth2Strategy } from 'remix-auth-oauth2'
-import { sessionStorage } from './session.server'
+import { createRemixAuth } from '@authaction/server-sdk/remix';
 
-export interface User {
-  sub: string
-  name: string
-  email: string
-  picture?: string
-  accessToken: string
-}
-
-export const authenticator = new Authenticator<User>(sessionStorage)
-
-authenticator.use(
-  new OAuth2Strategy(
-    {
-      clientId: process.env.AUTHACTION_CLIENT_ID!,
-      clientSecret: process.env.AUTHACTION_CLIENT_SECRET!,
-      authorizationEndpoint: `https://${process.env.AUTHACTION_TENANT_DOMAIN}/oauth2/authorize`,
-      tokenEndpoint: `https://${process.env.AUTHACTION_TENANT_DOMAIN}/oauth2/token`,
-      redirectURI: process.env.AUTHACTION_REDIRECT_URI!,
-      scopes: ['openid', 'profile', 'email'],
-    },
-    async ({ tokens }) => {
-      const accessToken = tokens.accessToken()
-
-      const userinfo = await fetch(
-        `https://${process.env.AUTHACTION_TENANT_DOMAIN}/oauth2/userinfo`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      ).then((r) => r.json())
-
-      return { ...userinfo, accessToken }
-    }
-  ),
-  'authaction'
-)
+export const auth = createRemixAuth({
+  domain: process.env.AUTHACTION_DOMAIN!,
+  clientId: process.env.AUTHACTION_CLIENT_ID!,
+  clientSecret: process.env.AUTHACTION_CLIENT_SECRET,
+  redirectUri: process.env.AUTHACTION_REDIRECT_URI!,
+  sessionSecret: process.env.SESSION_SECRET!,
+});
