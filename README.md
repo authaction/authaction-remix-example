@@ -1,12 +1,12 @@
 # authaction-remix-example
 
-A Remix application demonstrating OAuth2 authentication using [AuthAction](https://app.authaction.com/) with `remix-auth` and `remix-auth-oauth2`.
+A Remix application demonstrating OAuth2 authentication using [AuthAction](https://app.authaction.com/) with `@authaction/server-sdk`.
 
 ## Overview
 
 This application shows how to configure and handle authentication using AuthAction's OAuth2 service in a Remix application. The setup includes:
 
-- OAuth2 login flow using `remix-auth` with `remix-auth-oauth2` strategy
+- OAuth2 login flow using `@authaction/server-sdk/remix` with AuthAction as the OIDC provider
 - Secure server-side session management with encrypted cookies
 - Protected routes using loader-based auth checks
 - Logout with AuthAction's OIDC logout flow
@@ -14,7 +14,7 @@ This application shows how to configure and handle authentication using AuthActi
 ## Prerequisites
 
 - **Node.js 18+**
-- **AuthAction credentials**: `tenantDomain`, `clientId`, `clientSecret`, and configured redirect URIs.
+- **AuthAction credentials**: `domain`, `clientId`, `clientSecret`, and configured redirect URIs.
 
 ## Installation
 
@@ -40,12 +40,11 @@ This application shows how to configure and handle authentication using AuthActi
    Edit `.env` and replace the placeholders:
 
    ```env
-   AUTHACTION_TENANT_DOMAIN=your-authaction-tenant-domain
+   AUTHACTION_DOMAIN=your-authaction-tenant-domain
    AUTHACTION_CLIENT_ID=your-authaction-client-id
    AUTHACTION_CLIENT_SECRET=your-authaction-client-secret
    AUTHACTION_REDIRECT_URI=http://localhost:5173/auth/callback
-   AUTHACTION_LOGOUT_REDIRECT_URI=http://localhost:5173
-   SESSION_SECRET=your-secure-random-string
+   SESSION_SECRET=your-secure-random-string-min-32-chars
    ```
 
 4. **Configure redirect URIs in AuthAction dashboard**:
@@ -79,8 +78,8 @@ authaction-remix-example/
 │   │   ├── auth.callback.tsx   # Handles OAuth2 callback
 │   │   ├── auth.logout.tsx     # Destroys session + OIDC logout
 │   │   └── dashboard.tsx       # Protected page
-│   ├── auth.server.ts          # Authenticator + OAuth2Strategy setup
-│   ├── session.server.ts       # Cookie session storage
+│   ├── auth.server.ts          # createRemixAuth setup
+│   ├── session.server.ts       # (managed by @authaction/server-sdk)
 │   └── root.tsx
 ├── vite.config.ts
 ├── .env.example
@@ -89,29 +88,25 @@ authaction-remix-example/
 
 ## Code Explanation
 
-### `app/session.server.ts` — Session Storage
+### `app/auth.server.ts` — Auth Setup
 
-Creates an encrypted cookie-based session storage using `SESSION_SECRET`.
-
-### `app/auth.server.ts` — Authenticator
-
-Sets up `remix-auth` with `OAuth2Strategy` pointed at AuthAction's authorization and token endpoints. After a successful token exchange, fetches the user profile from the `userinfo` endpoint and stores it in the session.
+Calls `createRemixAuth` from `@authaction/server-sdk/remix` with your AuthAction credentials (`domain`, `clientId`, `clientSecret`, `redirectUri`, `sessionSecret`). The returned `auth` object exposes all auth handler methods.
 
 ### `app/routes/auth.login.tsx` — Login
 
-An action route that triggers the OAuth2 redirect to AuthAction's authorization endpoint.
+A loader route that calls `auth.handleLogin(request)` to redirect the user to AuthAction's authorization endpoint.
 
 ### `app/routes/auth.callback.tsx` — Callback
 
-A loader route that completes the OAuth2 flow — exchanges the code for tokens, fetches the user, and redirects to `/dashboard`.
+A loader route that calls `auth.handleCallback(request)` to complete the OAuth2 flow — exchanges the code for tokens and redirects to `/dashboard`.
 
 ### `app/routes/auth.logout.tsx` — Logout
 
-An action route that destroys the session cookie and redirects to AuthAction's OIDC logout endpoint.
+An action route that calls `auth.handleLogout(request)` to destroy the session cookie and redirect to AuthAction's OIDC logout endpoint.
 
 ### `app/routes/dashboard.tsx` — Protected Page
 
-Loader calls `authenticator.isAuthenticated()` and redirects to `/` if no session is found.
+Loader calls `auth.requireSession(request)` and redirects to `/` if no valid session is found. The user's name and email are returned to the component.
 
 ## Common Issues
 
@@ -119,7 +114,7 @@ Loader calls `authenticator.isAuthenticated()` and redirects to `/` if no sessio
 
 **Session issues** — Ensure `SESSION_SECRET` is a long, random string (32+ characters).
 
-**Network errors** — Verify your app can reach `https://{AUTHACTION_TENANT_DOMAIN}/oauth2/token`.
+**Network errors** — Verify your app can reach `https://{AUTHACTION_DOMAIN}/oauth2/token`.
 
 ## Contributing
 
